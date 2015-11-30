@@ -80,24 +80,36 @@ public class AddMessageHash extends AbstractTransformation {
 				throw new ParameterMissingException("PAYLOAD_FIELD_NAME parameter not found!");
 			}
 			
-			// get the text content of the payload and hash it
-			Node payloadNode = payloadNodeSet.item(0);
-			String textContent = payloadNode.getTextContent();
-			getTrace().addInfo("************************************");
-			getTrace().addInfo(textContent);
+			//Validation for mapping based message split to ensure both sets equal length
+			if (payloadNodeSet.getLength() != topLevelNodeSet.getLength()) {
+				throw new StreamTransformationException(String.format("Top level node count (%d) and payload node count (%d) not equal",
+						topLevelNodeSet.getLength(), payloadNodeSet.getLength()));
+			}
 			
-			String md5 = DigestUtils.md5Hex(textContent);
-
-			// create a new hash element and add it to the document 
-			Element newHashElement = document.createElement(hashNodeName);
-			newHashElement.appendChild(document.createTextNode(md5));
-			Node topLevelNode = topLevelNodeSet.item(0);
-			topLevelNode.appendChild(newHashElement);
-			
-			// delete the specified payload field if required
-			if (deletePayloadField) {
-				Node parent = payloadNode.getParentNode();
-				parent.removeChild(payloadNode);
+			for(int i = 0; i < topLevelNodeSet.getLength(); i++) {
+				//If we are deleting the nodes after use then we need to always grab element at first position
+				//as the set will reduce by one each time we do the delete
+				int payloadNodeIdx = deletePayloadField == true ? 0 : i;
+				
+				// get the text content of the payload and hash it
+				Node payloadNode = payloadNodeSet.item(payloadNodeIdx);
+				String textContent = payloadNode.getTextContent();
+				getTrace().addDebugMessage("************************************");
+				getTrace().addDebugMessage(textContent);
+				
+				String md5 = DigestUtils.md5Hex(textContent);
+	
+				// create a new hash element and add it to the document 
+				Element newHashElement = document.createElement(hashNodeName);
+				newHashElement.appendChild(document.createTextNode(md5));
+				Node topLevelNode = topLevelNodeSet.item(i);
+				topLevelNode.appendChild(newHashElement);
+				
+				// delete the specified payload field if required
+				if (deletePayloadField) {
+					Node parent = payloadNode.getParentNode();
+					parent = parent.removeChild(payloadNode);
+				}
 			}
 			
 			// transform the xml document to the output stream
